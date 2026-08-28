@@ -1,0 +1,140 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|c:\\users\\admin\\documents\\visualprojects\\ds4audioutil\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|c:\\users\\admin\\documents\\visualprojects\\ds4audioutil\\utils\\arguementsparser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|solutionrelative:utils\\arguementsparser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|c:\\users\\admin\\documents\\visualprojects\\ds4audioutil\\utils\\config.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|solutionrelative:utils\\config.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|c:\\users\\admin\\documents\\visualprojects\\ds4audioutil\\utils\\crc32.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|solutionrelative:utils\\crc32.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|c:\\users\\admin\\documents\\visualprojects\\ds4audioutil\\outputpacket.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{72D42456-164E-406C-B8E9-FDB61EE40BE5}|DS4AudioUtil.csproj|solutionrelative:outputpacket.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 11,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{e8b06f52-6d01-11d2-aa7d-00c04f990343}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{b1e99781-ab81-11d0-b683-00aa00a3ee26}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{dcc4ea97-1c0c-482b-b205-e541c0df9728}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:2:0:{dcc4ea97-1c0c-482b-b205-e541c0df9728}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:3:0:{34c7837f-3b3a-449c-bdf0-bdad86cbaf4a}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ArguementsParser.cs",
+              "DocumentMoniker": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Utils\\ArguementsParser.cs",
+              "RelativeDocumentMoniker": "Utils\\ArguementsParser.cs",
+              "ToolTip": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Utils\\ArguementsParser.cs",
+              "RelativeToolTip": "Utils\\ArguementsParser.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAADgvwsAAAArAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-28T20:31:21.272Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Crc32.cs",
+              "DocumentMoniker": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Utils\\Crc32.cs",
+              "RelativeDocumentMoniker": "Utils\\Crc32.cs",
+              "ToolTip": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Utils\\Crc32.cs",
+              "RelativeToolTip": "Utils\\Crc32.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-28T20:00:54.144Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAADQAAAAAAAAAAAAQwD8AAABKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T15:06:55.759Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Config.cs",
+              "DocumentMoniker": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Utils\\Config.cs",
+              "RelativeDocumentMoniker": "Utils\\Config.cs",
+              "ToolTip": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\Utils\\Config.cs",
+              "RelativeToolTip": "Utils\\Config.cs",
+              "ViewState": "AgIAADEAAAAAAAAAAAAiwDcAAAAtAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T14:30:39.76Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "OutputPacket.cs",
+              "DocumentMoniker": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\OutputPacket.cs",
+              "RelativeDocumentMoniker": "OutputPacket.cs",
+              "ToolTip": "C:\\Users\\Admin\\Documents\\VisualProjects\\DS4AudioUtil\\OutputPacket.cs",
+              "RelativeToolTip": "OutputPacket.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAgwA4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-17T10:27:06.18Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
