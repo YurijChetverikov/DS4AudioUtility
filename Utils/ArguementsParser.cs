@@ -98,6 +98,8 @@ namespace DS4AudioUtil.Utils
             {
                 result = targetType switch
                 {
+                    Type t when t == typeof(short) => short.Parse(cleanInput, style, CultureInfo.InvariantCulture),
+                    Type t when t == typeof(ushort) => ushort.Parse(cleanInput, style, CultureInfo.InvariantCulture),
                     Type t when t == typeof(int) => int.Parse(cleanInput, style, CultureInfo.InvariantCulture),
                     Type t when t == typeof(uint) => uint.Parse(cleanInput, style, CultureInfo.InvariantCulture),
                     Type t when t == typeof(long) => long.Parse(cleanInput, style, CultureInfo.InvariantCulture),
@@ -114,6 +116,7 @@ namespace DS4AudioUtil.Utils
         }
 
         private static bool isNumericType(Type type) =>
+            type == typeof(short) || type == typeof(ushort) ||
             type == typeof(int) || type == typeof(uint) ||
             type == typeof(long) || type == typeof(ulong) ||
             type == typeof(byte);

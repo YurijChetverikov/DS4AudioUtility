@@ -5,8 +5,8 @@
         internal static readonly Config Default = new Config()
         {
             GStreamerPath = @"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe",
-            GStreamerProcessName = "gst-launch-1.0",
             DS4VId = 1356,
+            BytesToReadFromControllerBuffer = 512,
 
             Frequency = 32000,
             Blocks = 16,
@@ -22,8 +22,8 @@
         internal static readonly Config HighQuality = new Config()
         {
             GStreamerPath = @"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe",
-            GStreamerProcessName = "gst-launch-1.0",
             DS4VId = 1356,
+            BytesToReadFromControllerBuffer = 512,
 
             Frequency = 32000,
             Blocks = 16,
@@ -39,8 +39,8 @@
         internal static readonly Config MediumQuality = new Config()
         {
             GStreamerPath = @"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe",
-            GStreamerProcessName = "gst-launch-1.0",
             DS4VId = 1356,
+            BytesToReadFromControllerBuffer = 512,
 
             Frequency = 32000,
             Blocks = 8,
@@ -54,8 +54,8 @@
         };
 
         public required string GStreamerPath;
-        public required string GStreamerProcessName;
         public required int DS4VId;
+        public required ushort BytesToReadFromControllerBuffer;
 
         // Audio Settings
         public required byte Subbands;

@@ -68,8 +68,8 @@ namespace DS4AudioUtil
                 Console.WriteLine("Configuration:\n");
 
                 Console.WriteLine($"GStreamerPath: {_config.GStreamerPath}");
-                Console.WriteLine($"GStreamerProcessName: {_config.GStreamerProcessName}");
                 Console.WriteLine($"DS4VId: {_config.DS4VId}");
+                Console.WriteLine($"BytesToReadFromControllerBuffer: {_config.BytesToReadFromControllerBuffer}");
                 Console.WriteLine($"Frequency: {_config.Frequency}");
                 Console.WriteLine($"Blocks: {_config.Blocks}");
                 Console.WriteLine($"Subbands: {_config.Subbands}");
@@ -87,6 +87,11 @@ namespace DS4AudioUtil
             }
 
 
+            if (File.Exists(_config.GStreamerPath) == false)
+            {
+                Console.WriteLine($"Unable to locate GStreamer at '{_config.GStreamerPath}'");
+                return;
+            }
 
 
             // Sframe = 4 + (4*subbands*channels/8) + (blocks*channels*bitpool/8)
@@ -207,17 +212,10 @@ namespace DS4AudioUtil
 
                 // Task that reads controller data
                 // This piece of code is important because without it DS4Windows won't be working
-                _ = Task.Run(async () =>
-                {
-                    byte[] discardBuffer = new byte[512];
-                    while (_isPlaying)
-                    {
 
-                        await _stream.ReadAsync(discardBuffer, 0, discardBuffer.Length);
-                        await Task.Delay(100);
-
-                    }
-                });
+                byte[] discardBuffer = new byte[_config.BytesToReadFromControllerBuffer];
+                _stream.Read(discardBuffer, 0, discardBuffer.Length);
+  
 
                 // Consumer audio thread / audio sender thread
                 Thread senderThread = new Thread(() =>
@@ -404,7 +402,7 @@ namespace DS4AudioUtil
             /* ... */
             bufWrite[78] = ((byte)(0 & 255)); /* Audio frame counter (endian 1)*/
             bufWrite[79] = ((byte)((0 / 256) & 255)); /* Audio frame counter (endian 2) */
-            bufWrite[80] = 0x24; /* 0x02 Speaker Mode On / 0x24 Headset Mode On*/
+            bufWrite[80] = 0x02; /* 0x02 Speaker Mode On / 0x24 Headset Mode On*/
 
             //bufWrite[330] = 0x00; bufWrite[331] = 0x00; bufWrite[332] = 0x00; bufWrite[333] = 0x00; /* CRC-32 */
             return bufWrite;
