@@ -15,7 +15,7 @@ Warning: you must write names of the arguments exactly in the case provided in t
 | Arguement name      |  Description  									|  Default value                                                             								      |
 |      :---           |     :---      									|        :---                                                                    								  |
 |--GStreamerPath      |Absolute path to GStreamer executable    		|`C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe`                   							  |
-|--BufferReadSize     |Bytes to read from controller    				|	`512`				                                                         					  |     
+|--BytesToReadFromControllerBuffer     |Bytes to read from controller    				|	`512`				                                                         					  |     
 |--Frequency          |Audio sampling rate							    |	`32000`				                                                         					  |     
 |--Blocks             |SBC Header: blocks count 						|	`16`			                                                         					  |     
 |--Subbands           |SBC Header: subbands count						|	`8`			                                                         					  |     
