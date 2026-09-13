@@ -1,6 +1,4 @@
-﻿using CSCore.Codecs;
-using CSCore.Codecs.WAV;
-using DS4AudioUtil.Utils;
+﻿using DS4AudioUtil.Utils;
 using HidSharp;
 using System.Collections.Concurrent;
 using System.ComponentModel;
@@ -69,15 +67,15 @@ namespace DS4AudioUtil
 
                 Console.WriteLine($"GStreamerPath: {_config.GStreamerPath}");
                 Console.WriteLine($"DS4VId: {_config.DS4VId}");
-                Console.WriteLine($"BytesToReadFromControllerBuffer: {_config.BytesToReadFromControllerBuffer}");
+                Console.WriteLine($"BufferReadSize: {_config.BufferReadSize}");
                 Console.WriteLine($"Frequency: {_config.Frequency}");
                 Console.WriteLine($"Blocks: {_config.Blocks}");
                 Console.WriteLine($"Subbands: {_config.Subbands}");
                 Console.WriteLine($"Bitpool: {_config.Bitpool}");
-                Console.WriteLine($"AudioFramesQueueSize: {_config.AudioFramesQueueSize}");
-                Console.WriteLine($"BuiltinSpeakerVolume: {_config.BuiltinSpeakerVolume}");
-                Console.WriteLine($"LeftEarVolume: {_config.LeftEarVolume}");
-                Console.WriteLine($"RightEarVolume: {_config.RightEarVolume}");
+                Console.WriteLine($"QueueSize: {_config.QueueSize}");
+                Console.WriteLine($"SpeakerVol: {_config.SpeakerVol}");
+                Console.WriteLine($"LeftEarVol: {_config.LeftEarVol}");
+                Console.WriteLine($"RightEarVol: {_config.RightEarVol}");
 
                 Console.WriteLine("\n");
             }
@@ -213,7 +211,7 @@ namespace DS4AudioUtil
                 // Task that reads controller data
                 // This piece of code is important because without it DS4Windows won't be working
 
-                byte[] discardBuffer = new byte[_config.BytesToReadFromControllerBuffer];
+                byte[] discardBuffer = new byte[_config.BufferReadSize];
                 _stream.Read(discardBuffer, 0, discardBuffer.Length);
   
 
@@ -301,7 +299,7 @@ namespace DS4AudioUtil
                                 byte[] completeFrame = accumulator.GetRange(0, AUDIO_DATA_SIZE).ToArray();
                                 accumulator.RemoveRange(0, AUDIO_DATA_SIZE);
 
-                                if (_audioQueue.Count < _config.AudioFramesQueueSize)
+                                if (_audioQueue.Count < _config.QueueSize)
                                 {
                                     byte[] bufWrite = new byte[462];
 
@@ -393,11 +391,11 @@ namespace DS4AudioUtil
             bufWrite[11] = _flashON; /* LED Flash On */
             bufWrite[12] = _flashOFF; /* LED Flash Off */
             /* ... */
-            bufWrite[20] = _config.LeftEarVolume; /* Vol Left */
-            bufWrite[21] = _config.RightEarVolume; /* Vol Right */
+            bufWrite[20] = _config.LeftEarVol; /* Vol Left */
+            bufWrite[21] = _config.RightEarVol; /* Vol Right */
             bufWrite[22] = 0x00; /* Unknown */
             bufWrite[23] = _volMic; /* Vol Mic */
-            bufWrite[24] = _config.BuiltinSpeakerVolume; /* Vol Built-in Speaker */
+            bufWrite[24] = _config.SpeakerVol; /* Vol Built-in Speaker */
             bufWrite[25] = 0x40; /* Unknown */
             /* ... */
             bufWrite[78] = ((byte)(0 & 255)); /* Audio frame counter (endian 1)*/
