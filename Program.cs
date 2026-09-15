@@ -23,7 +23,7 @@ namespace DS4AudioUtil
         static byte _flashOFF = 0x00; /* LED Flash Off */
 
 
-        private static Config _config = Config.HighQuality;
+        private static Config _config = Config.Default;
 
         private static Process _gstProcess;
         private static TcpClient _tcpClient;
@@ -59,7 +59,7 @@ namespace DS4AudioUtil
 
             Console.CursorVisible = false;
 
-            if (ArguementsParser.TryParse<Config>(args, Config.HighQuality, out var config))
+            if (ArguementsParser.TryParse<Config>(args, Config.Default, out var config))
             {
                 _config = config;
 
