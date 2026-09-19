@@ -1,5 +1,9 @@
 # DS4AudioUtility
 
+[![License: MIT](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Target Framework](https://img.shields.io/badge/.NET-9.0%20%7C%209.0-purple.svg)](https://dotnet.microsoft.com/ru-ru/download/dotnet/9.0)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](https://microsoft.com)
+
 ## This utility allows you to transmit sound to the speaker or audio output of the DualShock 4 controller without a Sony USB dongle.
 
 ## Quick start 

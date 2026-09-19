@@ -1,11 +1,11 @@
 ﻿using DS4AudioUtil.Utils;
 using HidSharp;
-using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Threading.Channels;
 
 namespace DS4AudioUtil
 {
@@ -32,7 +32,6 @@ namespace DS4AudioUtil
         private static HidDeviceLoader _loader = new HidDeviceLoader();
 
         private static double _delayBetweenPayloads = 16;
-        private static ConcurrentQueue<byte[]> _audioQueue = new ConcurrentQueue<byte[]>();
         private static bool _isPlaying = false;
 
 
@@ -99,7 +98,13 @@ namespace DS4AudioUtil
             _delayBetweenPayloads = ((double)AUDIO_DATA_SIZE / (4 + (4 * (double)_config.Subbands * 2 / 8) + ((double)_config.Blocks * 2 * (double)_config.Bitpool / 8))) * ((double)_config.Subbands * (double)_config.Blocks / (double)_config.Frequency) * 1000;
 
 
-
+            // Main cycle.
+            // If we playing now - just wait 500ms
+            // If not - wait for device to connect and then fire start() method
+            // 
+            // If exception occur - handle it:
+            // If IOException - device got disconnected
+            // If not - unexpected expection - something gone wrong. log it and break cycle 
 
             while (true)
             {
@@ -141,7 +146,7 @@ namespace DS4AudioUtil
                             _stream = device.Open();         
                             _stream.Write(sendInitReport());
 
-                            start();
+                            await start();
                         }
                     }
                     else
@@ -166,7 +171,10 @@ namespace DS4AudioUtil
         }
 
 
-        private static void start()
+        /// <summary>
+        /// Starts up GStreamer & producer and consumer, reads controller's buffer 
+        /// </summary>
+        private static async Task start()
         {
             Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
@@ -189,8 +197,10 @@ namespace DS4AudioUtil
                     FileName = _config.GStreamerPath,
                     Arguments = gstCommand,
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    RedirectStandardError = true
                 };
+
 
                 _gstProcess = new Process { StartInfo = startInfo };
                 _gstProcess.Start();
@@ -204,7 +214,6 @@ namespace DS4AudioUtil
                 _networkStream = tcpClient.GetStream();
                 tcpClient.NoDelay = true;
 
-                _audioQueue = new ConcurrentQueue<byte[]>();
                 _isPlaying = true;
 
 
@@ -213,143 +222,33 @@ namespace DS4AudioUtil
 
                 byte[] discardBuffer = new byte[_config.BufferReadSize];
                 _stream.Read(discardBuffer, 0, discardBuffer.Length);
-  
 
-                // Consumer audio thread / audio sender thread
-                Thread senderThread = new Thread(() =>
+
+                var channelOptions = new BoundedChannelOptions(capacity: _config.QueueSize)
                 {
-                    double msPerPacket = _delayBetweenPayloads;
-                    var sw = new Stopwatch();
-                    sw.Start();
-                    double nextPacketTime = 0;
+                    FullMode = BoundedChannelFullMode.DropNewest, 
+                    SingleWriter = true,                
+                    SingleReader = true 
+                };
 
-                    while (_isPlaying)
-                    {
-                        try
-                        {
-                            if (_audioQueue.TryDequeue(out byte[] bufWrite))
-                            {
-                                if (bufWrite != null)
-                                    _stream.Write(bufWrite);
+                Channel<byte[]> channel = Channel.CreateBounded<byte[]>(channelOptions);
 
-                                //byte[] buff_buffer = new byte[64];
-                                //int bytesRead = _stream.Read(buff_buffer, 0, buff_buffer.Length);
+                Task producerTask = produceDataAsync(channel.Writer, channel.Reader);
+                Task consumerTask = consumeAndSendDataAsync(channel.Reader);
 
-                                nextPacketTime += msPerPacket;
-                                while (sw.Elapsed.TotalMilliseconds < nextPacketTime)
-                                {
-                                    Thread.SpinWait(50);
-                                }
-                            }
-                            else
-                            {
-                                // Queue is empty. Wait for data
-                                Thread.Sleep(2);
-                            }
-                        }
-                        catch (IOException ex) when (ex.InnerException is Win32Exception win32Ex)
-                        {
-                            // Device not connected error
-                            if (win32Ex.NativeErrorCode == 1167)
-                            {
-                                Console.WriteLine("Controller disconnected!");
-                            }
-                            else
-                            {
-                                Console.WriteLine(ex);
-                            }
-                            _isPlaying = false;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine(ex);
-                            _isPlaying = false;
-                        }
-                    }
-                });
-
-
-                senderThread.Priority = ThreadPriority.Highest;
-                senderThread.Start();
-
-                // Producer thread / gstreamer reader
-                Thread producerThread = new Thread(() =>
+                await Task.WhenAll(producerTask, consumerTask);
+            }
+            catch (SocketException ex)
+            {
+                // Failed to connect to GStreamer server
+                string msgError = "GStreamer hasn't started yet";
+                if (_gstProcess != null)
                 {
-                    try
-                    {
-                        // Counter shows DS4 what frame number it's processing now
-                        ulong lilEndianCounter = 0;
+                    msgError = _gstProcess.StandardError.ReadToEnd();
+                }
 
-                        var accumulator = new List<byte>();
-                        byte[] socketBuffer = new byte[4096];
-
-                        while (_isPlaying)
-                        {
-                            int bytesRead = _networkStream.Read(socketBuffer, 0, socketBuffer.Length);
-                            if (bytesRead == 0) break;
-
-                            for (int i = 0; i < bytesRead; i++)
-                            {
-                                accumulator.Add(socketBuffer[i]);
-                            }
-
-                            // Slicing bytes from accumulator to complete DS4 frames  
-                            while (accumulator.Count >= AUDIO_DATA_SIZE)
-                            {
-                                byte[] completeFrame = accumulator.GetRange(0, AUDIO_DATA_SIZE).ToArray();
-                                accumulator.RemoveRange(0, AUDIO_DATA_SIZE);
-
-                                if (_audioQueue.Count < _config.QueueSize)
-                                {
-                                    byte[] bufWrite = new byte[462];
-
-
-                                    bufWrite[0] = 0x17; // Report ID
-                                    bufWrite[1] = 0x40; // 
-                                    bufWrite[2] = 0xA0;
-                                    bufWrite[3] = (byte)(lilEndianCounter & 0xFF);
-                                    bufWrite[4] = (byte)((lilEndianCounter >> 8) & 0xFF);
-                                    bufWrite[5] = 0x02;
-
-                                    Array.Copy(completeFrame, 0, bufWrite, 6, 448);
-                                    lilEndianCounter += 2;
-
-                                    // CRC32 is optional
-                                    //uint asdg = Crc32Algorithm.Compute(testBytes);
-                                    //byte[] df = BitConverter.GetBytes(asdg);
-
-                                    _audioQueue.Enqueue(bufWrite);
-                                }
-                                else
-                                {
-                                    // If this happens - it not good.
-                                    // It means that you try to send more data than controller can process
-                                    Thread.Sleep(1);
-                                    Console.WriteLine("Queue is full. Frame was dropped");
-                                }
-                            }
-                        }
-                    }
-                    catch (IOException ex) when (ex.InnerException is Win32Exception win32Ex)
-                    {
-                        // Device not connected error
-                        if (win32Ex.NativeErrorCode == 1167)
-                        {
-                            Console.WriteLine("Controller disconnected!");
-                        }
-                        else
-                        {
-                            Console.WriteLine(ex);
-                        }
-                        _isPlaying = false;
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex);
-                        _isPlaying = false;
-                    }
-                });
-                producerThread.Start();
+                Console.WriteLine($"Can't start GStreamer! GStreamer error message:\n{msgError}");
+                _isPlaying = false;
             }
             catch (IOException ex) when (ex.InnerException is Win32Exception win32Ex)
             {
@@ -367,10 +266,149 @@ namespace DS4AudioUtil
             }
         }
 
+        /// <summary>
+        /// Encodes PC audio to SBC and sends in to Channel
+        /// </summary>
+        private static async Task produceDataAsync(ChannelWriter<byte[]> writer, ChannelReader<byte[]> reader)
+        {
+            try
+            {
+                // Counter shows DS4 what frame number it's processing now
+                ulong lilEndianCounter = 0;
+
+                var accumulator = new List<byte>();
+                byte[] socketBuffer = new byte[4096];
+
+                while (_isPlaying)
+                {
+                    int bytesRead = await _networkStream.ReadAsync(socketBuffer, 0, socketBuffer.Length);
+                    if (bytesRead == 0) break;
+
+                    for (int i = 0; i < bytesRead; i++)
+                    {
+                        accumulator.Add(socketBuffer[i]);
+                    }
+
+                    // Slicing bytes from accumulator to complete DS4 frames  
+                    while (accumulator.Count >= AUDIO_DATA_SIZE)
+                    {
+                        byte[] completeFrame = accumulator.GetRange(0, AUDIO_DATA_SIZE).ToArray();
+                        accumulator.RemoveRange(0, AUDIO_DATA_SIZE);
+
+                        byte[] bufWrite = new byte[462];
+
+                        bufWrite[0] = 0x17; // Report ID
+                        bufWrite[1] = 0x40; // 
+                        bufWrite[2] = 0xA0;
+                        bufWrite[3] = (byte)(lilEndianCounter & 0xFF);
+                        bufWrite[4] = (byte)((lilEndianCounter >> 8) & 0xFF);
+                        bufWrite[5] = 0x02;
+
+                        Array.Copy(completeFrame, 0, bufWrite, 6, 448);
+                        lilEndianCounter += 2;
+
+                        // CRC32 is optional. I prefer to not compute it.
+
+                        if (reader.Count == _config.QueueSize)
+                        {
+                            // If this happens - it's not good.
+                            // It means that you try to send more data than controller can process
+                            Thread.Sleep(1);
+                            Console.WriteLine($"Queue is full ({_config.QueueSize}/{_config.QueueSize}). Frame was dropped");
+                        }
+                        else
+                        {
+                            writer.TryWrite(bufWrite);
+                        }
+                    }
+                }
+            }
+            catch (IOException ex) when (ex.InnerException is System.Net.Sockets.SocketException socketEx)
+            {
+                // GStreamer disconnected
+                Console.WriteLine("GStreamer dicsonnected!");
+                _isPlaying = false;
+            }
+            catch (IOException ex) when (ex.InnerException is Win32Exception win32Ex)
+            {
+                // Device not connected error
+                if (win32Ex.NativeErrorCode == 1167)
+                {
+                    Console.WriteLine("Controller disconnected!");
+                }
+                else
+                {
+                    Console.WriteLine(ex);
+                }
+                _isPlaying = false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                _isPlaying = false;
+            }
+            finally
+            {
+                writer.Complete();
+            }
+        }
 
         /// <summary>
-        /// Send report ID 0x15 to controller
-        /// Send 
+        /// Reads SBC-encoded PC audio from Channel and writes it to the controller
+        /// </summary>
+        private static async Task consumeAndSendDataAsync(ChannelReader<byte[]> reader)
+        {
+            var sw = new Stopwatch();
+            await foreach(byte[] payload in reader.ReadAllAsync())
+            {
+                double msPerPacket = 0;
+                sw.Start();
+                double nextPacketTime = 0;
+
+                if (_isPlaying)
+                {
+                    try
+                    {
+                        if (payload != null)
+                            _stream.Write(payload);
+
+                        nextPacketTime += msPerPacket;
+                        while (sw.Elapsed.TotalMilliseconds < nextPacketTime)
+                        {
+                            Thread.SpinWait(50);
+                        }
+                    }
+                    catch (IOException ex) when (ex.InnerException is Win32Exception win32Ex)
+                    {
+                        // Device not connected error
+                        if (win32Ex.NativeErrorCode == 1167)
+                        {
+                            Console.WriteLine("Controller disconnected!");
+                        }
+                        else if (win32Ex.NativeErrorCode == 31)
+                        {
+                            Console.WriteLine("Controller can't process SBC encoding configuration that provided");
+                        }
+                        else
+                        {
+                            Console.WriteLine(ex);
+                        }
+                        _isPlaying = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                        _isPlaying = false;
+                    }
+                }
+
+                sw.Reset();
+            }
+        }
+
+
+        /// <summary>
+        /// Send report ID 0x15 to controller with all the configuration
         /// </summary>
         /// <returns></returns>
         private static byte[] sendInitReport()
