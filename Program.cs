@@ -1,19 +1,23 @@
-﻿using DS4AudioUtil.Utils;
+﻿using DS4AudioUtility.Utils;
 using HidSharp;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Channels;
 
-namespace DS4AudioUtil
+namespace DS4AudioUtility
 {
     internal class Program
     {
-        const int AUDIO_DATA_SIZE = 448;
+        const int DUAL_CHANNEL_AUDIO_DATA_SIZE = 448;
+        const int JOINT_STEREO_AUDIO_DATA_SIZE = 460;
+        static int AUDIO_DATA_SIZE = DUAL_CHANNEL_AUDIO_DATA_SIZE;
+        static byte FRAMES_IN_PAYLOAD = 4;
 
-        /* DUAL-SHOCK 4 settings */
+        /* DUAL-SHOCK 4 settings set-up report */
         static byte _protocolID = 0x15; /* Protocol ID */
         static byte _modeType = 0xc0; /* c0 Bluetooth Mode / a0 USB Mode */
         static byte _transactionType = 0xa2; /* Transaction Type is DATA (0xa0). Report Type is OUTPUT (0x02) */
@@ -23,7 +27,9 @@ namespace DS4AudioUtil
         static byte _flashOFF = 0x00; /* LED Flash Off */
 
 
-        private static Config _config = Config.Default;
+
+
+        private static Config _config = Config.DefaultDual;
 
         private static Process _gstProcess;
         private static TcpClient _tcpClient;
@@ -31,43 +37,60 @@ namespace DS4AudioUtil
         private static HidStream _stream;
         private static HidDeviceLoader _loader = new HidDeviceLoader();
 
+        private static Stopwatch GlobalWatch = new Stopwatch();
+        private static Dumper _dumper = new Dumper(AppDomain.CurrentDomain.BaseDirectory + Path.DirectorySeparatorChar + "dump.txt");
+
         private static double _delayBetweenPayloads = 16;
-        private static bool _isPlaying = false;
+        private static volatile bool _isPlaying = false;
+        private static volatile bool _isQueueFull = false;
+        private static bool _isShuttingDown = false;
 
 
         static async Task Main(string[] args)
         {
+            
             // Registering posix signals to shut down application properly
-            using var reg = PosixSignalRegistration.Create(PosixSignal.SIGINT, context =>
+            using var reg = PosixSignalRegistration.Create(PosixSignal.SIGINT, async context =>
             {
                 context.Cancel = true;
                 Console.CursorVisible = true;
                 Console.WriteLine("Shutting down...");
+                _isShuttingDown = true;
                 stop();
+                await _dumper.DisposeAsync();
                 Environment.Exit(0);
             });
 
-            using var regTerm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+            using var regTerm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, async context =>
             {
                 context.Cancel = true;
                 Console.CursorVisible = true;
                 Console.WriteLine("Shutting down...");
+                _isShuttingDown = true;
                 stop();
+                await _dumper.DisposeAsync();
                 Environment.Exit(0);
             });
 
             Console.CursorVisible = false;
 
-            if (ArguementsParser.TryParse<Config>(args, Config.Default, out var config))
+            if (ArguementsParser.TryParse<Config>(args, Config.DefaultDual, out var config))
             {
+                if (_config.ChannelMode != "dual" && _config.ChannelMode != "joint")
+                {
+                    // Invalid channel mode
+                    Console.WriteLine($"Error: Value '{_config.ChannelMode}' for arguement '--ChannelMode' has invalid value (can be 'dual' or 'joint')");
+                    return;
+                }
+
                 _config = config;
 
                 Console.WriteLine("Configuration:\n");
 
                 Console.WriteLine($"GStreamerPath: {_config.GStreamerPath}");
                 Console.WriteLine($"DS4VId: {_config.DS4VId}");
-                Console.WriteLine($"BufferReadSize: {_config.BufferReadSize}");
-                Console.WriteLine($"Frequency: {_config.Frequency}");
+                Console.WriteLine($"SaveDump: {_config.SaveDump}");
+                Console.WriteLine($"ChannelMode: {_config.ChannelMode}");
                 Console.WriteLine($"Blocks: {_config.Blocks}");
                 Console.WriteLine($"Subbands: {_config.Subbands}");
                 Console.WriteLine($"Bitpool: {_config.Bitpool}");
@@ -91,11 +114,36 @@ namespace DS4AudioUtil
             }
 
 
+            // IF channel mode = dual:
             // Sframe = 4 + (4*subbands*channels/8) + (blocks*channels*bitpool/8)
+
+            // IF channel mode = joint:
+            // Sframe = 4 + (4*subbands*channels/8) + (blocks*channels*bitpool/8)
+
+            // Common formulas:
             // Nframes = AUDIO_DATA_SIZE/Sframe
             // Delay = Nframes * (subbands*blocks/frequency)
 
-            _delayBetweenPayloads = ((double)AUDIO_DATA_SIZE / (4 + (4 * (double)_config.Subbands * 2 / 8) + ((double)_config.Blocks * 2 * (double)_config.Bitpool / 8))) * ((double)_config.Subbands * (double)_config.Blocks / (double)_config.Frequency) * 1000;
+            double sFrame = 0;
+            double nFrames = 0;
+
+            
+
+            if (_config.ChannelMode == "dual")
+            {
+                sFrame = 4 + (4 * (double)_config.Subbands * 2 / 8) + ((double)_config.Blocks * 2 * (double)_config.Bitpool / 8);
+                AUDIO_DATA_SIZE = DUAL_CHANNEL_AUDIO_DATA_SIZE;
+            }
+            else if (_config.ChannelMode == "joint")
+            {
+                sFrame = 4 + (double)_config.Subbands + ((double)_config.Subbands + (double)_config.Blocks * (double)_config.Bitpool) / 8;
+                AUDIO_DATA_SIZE = JOINT_STEREO_AUDIO_DATA_SIZE;
+            }
+
+
+            nFrames = (double)AUDIO_DATA_SIZE / sFrame;
+            _delayBetweenPayloads = nFrames * ((double)_config.Subbands * (double)_config.Blocks / 32000) * 1000;
+            FRAMES_IN_PAYLOAD = (byte)nFrames;
 
 
             // Main cycle.
@@ -106,10 +154,14 @@ namespace DS4AudioUtil
             // If IOException - device got disconnected
             // If not - unexpected expection - something gone wrong. log it and break cycle 
 
+
             while (true)
             {
                 try
                 {
+                    if (_isShuttingDown)
+                        break;
+
                     if(_isPlaying == false)
                     {
                         var device = _loader.GetDevices().Where(d => d.VendorID == _config.DS4VId).FirstOrDefault();
@@ -143,7 +195,7 @@ namespace DS4AudioUtil
                         {
                             Console.WriteLine("Connected successfully");
 
-                            _stream = device.Open();         
+                            _stream = device.Open();
                             _stream.Write(sendInitReport());
 
                             await start();
@@ -167,7 +219,8 @@ namespace DS4AudioUtil
                 }
             }
 
-            stop();
+            if (_isShuttingDown == false)
+                stop();
         }
 
 
@@ -176,8 +229,6 @@ namespace DS4AudioUtil
         /// </summary>
         private static async Task start()
         {
-            Thread.CurrentThread.Priority = ThreadPriority.Highest;
-
             try
             {
                 int tcpPort = getFreeTcpPort();
@@ -187,9 +238,9 @@ namespace DS4AudioUtil
                     $"wasapisrc loopback=true ! " +
                     "audioconvert ! audioresample ! " +
                     "audioresample quality=10 !" +
-                    $"audio/x-raw,rate={_config.Frequency},channels=2 ! " +
+                    $"audio/x-raw,rate=32000,channels=2 ! " +
                     "sbcenc ! " +
-                    $"audio/x-sbc,channels=2,rate={_config.Frequency},channel-mode=dual,blocks={_config.Blocks},subbands={_config.Subbands},bitpool={_config.Bitpool} ! " +
+                    $"audio/x-sbc,channels=2,rate=32000,channel-mode={_config.ChannelMode},blocks={_config.Blocks},subbands={_config.Subbands},bitpool={_config.Bitpool} ! " +
                     $"tcpserversink host=127.0.0.1 port={tcpPort}";
 
                 var startInfo = new ProcessStartInfo
@@ -204,7 +255,7 @@ namespace DS4AudioUtil
 
                 _gstProcess = new Process { StartInfo = startInfo };
                 _gstProcess.Start();
-                Thread.Sleep(250);  // Wait a little bit
+                await Task.Delay(250);  // Wait a little bit
 
                 ProcessTracker.AttachProcess(_gstProcess); // Make OS kill gst process after we quit the application
 
@@ -216,14 +267,6 @@ namespace DS4AudioUtil
 
                 _isPlaying = true;
 
-
-                // Task that reads controller data
-                // This piece of code is important because without it DS4Windows won't be working
-
-                byte[] discardBuffer = new byte[_config.BufferReadSize];
-                _stream.Read(discardBuffer, 0, discardBuffer.Length);
-
-
                 var channelOptions = new BoundedChannelOptions(capacity: _config.QueueSize)
                 {
                     FullMode = BoundedChannelFullMode.DropNewest, 
@@ -232,6 +275,9 @@ namespace DS4AudioUtil
                 };
 
                 Channel<byte[]> channel = Channel.CreateBounded<byte[]>(channelOptions);
+
+                GlobalWatch = new Stopwatch();
+                GlobalWatch.Restart();
 
                 Task producerTask = produceDataAsync(channel.Writer, channel.Reader);
                 Task consumerTask = consumeAndSendDataAsync(channel.Reader);
@@ -293,19 +339,40 @@ namespace DS4AudioUtil
                     while (accumulator.Count >= AUDIO_DATA_SIZE)
                     {
                         byte[] completeFrame = accumulator.GetRange(0, AUDIO_DATA_SIZE).ToArray();
+
                         accumulator.RemoveRange(0, AUDIO_DATA_SIZE);
 
-                        byte[] bufWrite = new byte[462];
+                        byte[]? bufWrite = null;
 
-                        bufWrite[0] = 0x17; // Report ID
-                        bufWrite[1] = 0x40; // 
-                        bufWrite[2] = 0xA0;
-                        bufWrite[3] = (byte)(lilEndianCounter & 0xFF);
-                        bufWrite[4] = (byte)((lilEndianCounter >> 8) & 0xFF);
-                        bufWrite[5] = 0x02;
+                        if (_config.ChannelMode == "joint")
+                        {
+                            bufWrite = new byte[530];
 
-                        Array.Copy(completeFrame, 0, bufWrite, 6, 448);
-                        lilEndianCounter += 2;
+                            bufWrite[0] = 0x18; // Report ID
+                            bufWrite[1] = 0x48;
+                            bufWrite[2] = 0xA1;
+                            bufWrite[3] = ((byte)(lilEndianCounter & 255)); /* Audio frame counter (endian 1)*/
+                            bufWrite[4] = ((byte)((lilEndianCounter / 256) & 255)); /* Audio frame counter (endian 2) */
+
+                            bufWrite[5] = 0x22;
+
+                            Array.Copy(completeFrame, 0, bufWrite, 6, AUDIO_DATA_SIZE);
+                            lilEndianCounter += FRAMES_IN_PAYLOAD;
+                        }
+                        else if (_config.ChannelMode == "dual")
+                        {
+                            bufWrite = new byte[462];
+
+                            bufWrite[0] = 0x17; // Report ID
+                            bufWrite[1] = 0x40; 
+                            bufWrite[2] = 0xA0;
+                            bufWrite[3] = ((byte)(lilEndianCounter & 255)); /* Audio frame counter (endian 1)*/
+                            bufWrite[4] = ((byte)((lilEndianCounter / 256) & 255));  /* Audio frame counter (endian 2) */
+                            bufWrite[5] = 0x02;
+
+                            Array.Copy(completeFrame, 0, bufWrite, 6, AUDIO_DATA_SIZE);
+                            lilEndianCounter += FRAMES_IN_PAYLOAD;
+                        }
 
                         // CRC32 is optional. I prefer to not compute it.
 
@@ -313,12 +380,46 @@ namespace DS4AudioUtil
                         {
                             // If this happens - it's not good.
                             // It means that you try to send more data than controller can process
+                            _isQueueFull = true;
                             Thread.Sleep(1);
                             Console.WriteLine($"Queue is full ({_config.QueueSize}/{_config.QueueSize}). Frame was dropped");
                         }
                         else
                         {
+                            _isQueueFull = false;
                             writer.TryWrite(bufWrite);
+                        }
+
+
+                        if (_config.SaveDump)
+                        {
+                            using (MemoryStream ms = new MemoryStream())
+                            {
+                                await ms.WriteAsync(Encoding.UTF8.GetBytes($"PAYLOAD DUMP ({GlobalWatch.Elapsed.ToString("mm\\:ss\\.ffff")}):\n"));
+                                if (bufWrite == null)
+                                {
+                                    await ms.WriteAsync(Encoding.UTF8.GetBytes("NULL NULL NULL NULL\n"));
+                                }
+                                else
+                                {
+                                    for (int i = 0; i < bufWrite.Length / 16; i++)
+                                    {
+                                        for (int h = 0; h < 16; h++)
+                                        {
+                                            if (bufWrite.Length <= i * 16 + h)
+                                                break;
+                                            await ms.WriteAsync(Encoding.UTF8.GetBytes("0x" + bufWrite[i * 16 + h].ToString("X2") + (' ')));
+                                        }
+                                        await ms.WriteAsync(Encoding.UTF8.GetBytes("\n"));
+                                    }
+
+                                }
+                                await ms.WriteAsync(Encoding.UTF8.GetBytes("\n-----------------------------------------------------------------------------\n"));
+
+                                await ms.FlushAsync();
+
+                                await _dumper.DumpBytesAsync(ms.ToArray());
+                            }
                         }
                     }
                 }
@@ -359,24 +460,63 @@ namespace DS4AudioUtil
         private static async Task consumeAndSendDataAsync(ChannelReader<byte[]> reader)
         {
             var sw = new Stopwatch();
+
+            byte counter = 0;
+
+            double msPerPacket = _delayBetweenPayloads;
+            double fullQueueMsPerPacket = msPerPacket * 0.5;
+            long previousPayloadMs = 0;
+            double nextPacketTime = 0;
+
             await foreach(byte[] payload in reader.ReadAllAsync())
             {
-                double msPerPacket = 0;
-                sw.Start();
-                double nextPacketTime = 0;
-
                 if (_isPlaying)
                 {
                     try
                     {
                         if (payload != null)
+                        {
+                            if (sw.IsRunning == false)
+                            {
+                                sw.Start();
+                            }
+                            else
+                            {
+                                while (sw.Elapsed.TotalMilliseconds < previousPayloadMs + (_isQueueFull ? fullQueueMsPerPacket : msPerPacket))
+                                {
+                                    //await Task.Delay(1);
+                                    Thread.SpinWait(50);
+                                }
+                            }
+
+                            //Console.WriteLine($"{sw.ElapsedMilliseconds - previousPayloadMs}");
+
+                            previousPayloadMs = sw.ElapsedMilliseconds;
+
+                            
+
                             _stream.Write(payload);
 
-                        nextPacketTime += msPerPacket;
-                        while (sw.Elapsed.TotalMilliseconds < nextPacketTime)
-                        {
-                            Thread.SpinWait(50);
+                            // Every 10 payloads and if _config.ReadBuffer == true 
+                            // read the controller's buffer
+                            // it may sometimes help with disconnecting in DS4Windows
+                            if (_config.ReadBuffer)
+                            {
+                                if (counter == 10)
+                                {
+                                    _stream.Read();
+                                    counter = 0;
+                                }
+                                counter++;
+                            }
                         }
+                            
+
+                    }
+                    catch (System.ObjectDisposedException ex)
+                    {
+                        // close() fired
+                        _isPlaying = false;
                     }
                     catch (IOException ex) when (ex.InnerException is Win32Exception win32Ex)
                     {
@@ -402,9 +542,11 @@ namespace DS4AudioUtil
                     }
                 }
 
-                sw.Reset();
+                //sw.Reset();
             }
         }
+
+
 
 
         /// <summary>
@@ -438,7 +580,7 @@ namespace DS4AudioUtil
             /* ... */
             bufWrite[78] = ((byte)(0 & 255)); /* Audio frame counter (endian 1)*/
             bufWrite[79] = ((byte)((0 / 256) & 255)); /* Audio frame counter (endian 2) */
-            bufWrite[80] = 0x02; /* 0x02 Speaker Mode On / 0x24 Headset Mode On*/
+            bufWrite[80] = 0x24; /* 0x02 Speaker Mode On / 0x24 Headset Mode On*/
 
             //bufWrite[330] = 0x00; bufWrite[331] = 0x00; bufWrite[332] = 0x00; bufWrite[333] = 0x00; /* CRC-32 */
             return bufWrite;

@@ -6,87 +6,82 @@
 
 ## This utility allows you to transmit sound to the speaker or audio output of the DualShock 4 controller without a Sony USB dongle.
 
+
+![Quick demo](/img/video.gif)
+
+
 ## Quick start 
 
-* Download and install latest verison of [GStreamer](https://gstreamer.freedesktop.org/download)
-* Download [Latest release](https://github.com/YurijChetverikov/DS4AudioUtility)
+* Download and install the latest version of [GStreamer](https://gstreamer.freedesktop.org/download)
+* Download the [latest release](https://github.com/YurijChetverikov/DS4AudioUtility)
 * Unzip it in any location on your PC
-* Run executable file
+* Run the executable file
 
-## Arguements
+## Arguments
 
 ***Warning: you must write names of the arguments exactly in the case provided in the table below:***
 
-| Arguement name      |  Description  									|  Default value                                                             								      |
-|      :---           |     :---      									|        :---                                                                    								  |
-|--GStreamerPath      |Absolute path to GStreamer executable    		|`C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe`                   							  |
-|--BufferReadSize     |Bytes to read from controller    				|	`512`				                                                         					  |     
-|--Frequency          |Audio sampling rate							    |	`32000`				                                                         					  |     
-|--Blocks             |SBC encoding: blocks count 						|	`16`			                                                         					  |     
-|--Subbands           |SBC encoding: subbands count						|	`8`			                                                         					  |     
-|--Bitpool            |SBC encoding: bitpool count						|	`25`		                                                         					  |     
-|--QueueSize          |DS4 payloads queue size 					        |	`10`				                                                         					  |     
-|--SpeakerVol         |Builtin speaker volume 					        |	`70`				                                                         					  |     
-|--LeftEarVol         |Left ear volume 					        		|	`115`				                                                         					  |     
-|--RightEarVol        |Right ear volume 					        	|	`115`				                                                         					  |     
+| Argument name       | Description                                        | Default value                                                       |
+| :---                | :---                                               | :---                                                                |
+|--GStreamerPath      | Absolute path to the GStreamer executable          | `C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe` |
+|--DS4VId             | DS4 Vendor ID                                      | `1356` (`0x54C`)                                                    |
+|--SaveDump           | Saves controller payloads to dump.txt              | `false`                                                             |
+|--ReadBuffer         | Reads buffer every 10th payload                    | `false`                                                             |
+|--ChannelMode        | SBC encoding: channel mode                         | `dual`                                                              |
+|--Blocks             | SBC encoding: block count                          | `16`                                                                |
+|--Subbands           | SBC encoding: subband count                        | `8`                                                                 |
+|--Bitpool            | SBC encoding: bitpool count                        | `25`                                                                |
+|--QueueSize          | DS4 payload queue size                             | `10`                                                                |
+|--SpeakerVol         | Built-in speaker volume                            | `70`                                                                |
+|--LeftEarVol         | Left ear volume                                    | `115`                                                               |
+|--RightEarVol        | Right ear volume                                   | `115`                                                               |
 
-### BufferReadSize
+### Dump
 
-We need sometimes to read the controller's buffer so that DS4Windows works correctly and doesn’t disable the controller a second after it’s detected. 
-
-So BufferReadSize can be `256`, `512`, `1024` or another value - you can adjust this value for your setup for better experience.
+`SaveDump` enables a feature that saves every payload that has been sent to the controller to the `dump.txt` file in the application directory.
 
 ### SBC encoding
 
-Because we using report with id 0x17 which contains 448 bytes of audio data, we need to make sure size of our SBC frame <= 448 bytes.
+Two channel modes are implemented: `dual` and `joint`.
 
-To calculate single audio frame size, you can use formula:
+* For `dual`, we send a report with ID 0x17, which contains 448 bytes of audio data.
+* For `joint`, we send a report with ID 0x18, which contains 460 bytes of audio data.
+
+Calculating the possible encoder configuration depends on the channel mode you are using. Frequency is fixed at 32000 Hz.
+
+To calculate a single audio frame size, you can use the formula:
+
+* For `dual` channel mode:
 
 ```
-FrameSize = 4 + (4*subbands*channels/8) + (blocks*channels*bitpool/8)
+FrameSize = 4 + (4 * subbands * channels / 8) + (blocks * channels * bitpool / 8)
 ``` 
-Below, I have listed the possible SBC encoder configuration options:
 
-|SBC frame size|Frames in payload|Blocks|Subbands|Bitpool|
-|:---|:---|:---|:---|:---|
-28|16|4|4|20
-32|14|4|4|24
-32|14|4|8|20
-56|8|4|8|44
-56|8|4|4|48
-56|8|8|4|24
-56|8|8|8|22
-64|7|4|4|56
-64|7|4|8|52
-64|7|8|4|28
-64|7|8|8|26
-112|4|8|4|52
-112|4|8|8|50
-112|4|16|4|26
-112|4|16|8|25
-224|2|12|4|72
-224|2|16|4|54
-224|2|16|8|53
+* For `joint` channel mode:
 
+```
+FrameSize = 4 + (4 * subbands * channels / 8) + ((subbands + blocks * bitpool) / 8)
+``` 
 
+***You must set the encoder configuration so that your SBC frames fit perfectly into 448 (or 460) bytes of audio data.*** 
 
 PlayStation uses this config:
 
-* Blocks: 16
-* Subbands: 8
-* Bitpool: 25
-* Frequency: 32000
+* For `dual`
 
-I managed to get it to work well at slightly higher configuration:
+  * Blocks: 16
+  * Subbands: 8
+  * Bitpool: 53
 
-* Blocks: 16
-* Subbands: 8
-* Bitpool: 53
-* Frequency: 32000
+* For `joint`
+
+  * Blocks: 16
+  * Subbands: 8
+  * Bitpool: 51
 
 ### QueueSize
 
-QueueSize sets the size of the controller payloads queue.
+QueueSize sets the size of the controller payload queue.
 10 is enough, but if you use enhanced audio quality, within a few minutes (or even seconds),
 you'll start receiving `Queue is full. Frame was dropped` messages.
 
@@ -97,14 +92,24 @@ and increasing the queue size won't help.
 
 From 0 to 255.
 
-## Knows issues
+## Delay in DS4Windows
+
+I used `dual` channel mode and default PS4 SBC encoder configuration. Poll inverval: 16ms. Average delay was 12-20ms
+
+![DS4Windows screenshot](/img/delay.png)
+
+## Algorithm
+
+![Algorithm schema](/img/scheme.png)
+
+## Known issues
 
 ### When connected to DS4Windows, it works incorrectly and disables the controller a second after it’s detected
 
-I dont know why this happens. Some collision between DS4Windows and my utility.
-But we can fix this by sometimes read the controller's buffer. 
+I don't know why this happens. It is due to some collision between DS4Windows and my utility.
+But we can fix this by occasionally reading the controller's buffer. 
 
-I hardcoded it so that the program reads from the controller’s buffer `BufferReadSize` once before starting.
+I hardcoded it so that the program reads a report from the controller’s buffer every 10th payload it sends if `ReadBuffer` is `true`.
 
 ## Compilation
 

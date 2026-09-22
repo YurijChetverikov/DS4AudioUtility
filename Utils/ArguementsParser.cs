@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 using System.Reflection;
 
-namespace DS4AudioUtil.Utils
+namespace DS4AudioUtility.Utils
 {
     internal static class ArguementsParser
     {

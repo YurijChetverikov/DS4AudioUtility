@@ -1,31 +1,15 @@
-﻿namespace DS4AudioUtil.Utils
+﻿namespace DS4AudioUtility.Utils
 {
     internal struct Config
     {
-        internal static readonly Config Default = new Config()
+        internal static readonly Config DefaultDual = new Config()
         {
             GStreamerPath = @"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe",
             DS4VId = 1356,
-            BufferReadSize = 512,
+            SaveDump = false,
+            ReadBuffer = false,
 
-            Frequency = 32000,
-            Blocks = 16,
-            Subbands = 8,
-            Bitpool = 25,
-            QueueSize = 10,
-
-            SpeakerVol = 70,
-            LeftEarVol = 0x73,
-            RightEarVol = 0x73,
-        };
-
-        internal static readonly Config HighQuality = new Config()
-        {
-            GStreamerPath = @"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe",
-            DS4VId = 1356,
-            BufferReadSize = 512,
-
-            Frequency = 32000,
+            ChannelMode = "dual",
             Blocks = 16,
             Subbands = 8,
             Bitpool = 53,
@@ -36,16 +20,17 @@
             RightEarVol = 0x73,
         };
 
-        internal static readonly Config MediumQuality = new Config()
+        internal static readonly Config DefaultJoint = new Config()
         {
             GStreamerPath = @"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe",
             DS4VId = 1356,
-            BufferReadSize = 512,
+            SaveDump = false,
+            ReadBuffer = false,
 
-            Frequency = 32000,
-            Blocks = 8,
+            ChannelMode = "joint",
+            Blocks = 16,
             Subbands = 8,
-            Bitpool = 26,
+            Bitpool = 51,
             QueueSize = 10,
 
             SpeakerVol = 70,
@@ -55,13 +40,14 @@
 
         public required string GStreamerPath;
         public required int DS4VId;
-        public required ushort BufferReadSize;
+        public required bool SaveDump;
+        public required bool ReadBuffer;
 
         // Audio Settings
         public required byte Subbands;
         public required byte Bitpool;
         public required byte Blocks;
-        public required ushort Frequency;
+        public required string ChannelMode;
         public required byte QueueSize;
 
         // Controller Settings

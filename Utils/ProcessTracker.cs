@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace DS4AudioUtil.Utils
+namespace DS4AudioUtility.Utils
 {
     /// <summary>
     /// Purpose of this class is to tell OS that when application is closed -
